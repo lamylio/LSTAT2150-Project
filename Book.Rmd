@@ -1,0 +1,234 @@
+---
+title: "Book"
+author: "Lamy Lionel"
+date: "02/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Setup
+```{r}
+set.seed(2020)
+
+# Import custom R files
+source("./sources/setup.r")
+source("./sources/minimization.r")
+
+# Global constant X & Y (used for comparison)
+CP.X = X(n)
+CP.Y = Y(CP.X)
+CP.x = seq(0, 1, length = n) 
+
+# Kernels
+Knorm = function(u) dnorm(u) #Gaussian kernel
+Kunif = function(u) (abs(u) <= 1) * 0.5 #Uniform kernel
+
+# NW Estimator
+NW.regEst <- function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
+```
+
+# Finding best bandwidth and polynomial order
+
+```{r}
+# See ./sources/minimization.r
+# Warning: might take a while
+# Use ni=100, M=100 by default but better results with higher values
+
+# NW.MISE = NW.minimizeMISE() # 0.041
+# NW.MSSE = NW.minimizeMSSE() # 0.036
+# ---
+
+NW.MISE = NW.minimizeMISE(h.test = seq(0.035, 0.037, 0.00001), M=200)
+LM.MSSE = LM.minimizeMSSE() # 
+
+# Optimal bandwidth
+NW.h = 0.0355 # NW.MISE[2]
+# Optimal degree
+LM.poly = 6 # LM.MSSE[2]
+```
+
+## Investigation at interesting points
+
+```{r}
+CP.to_check = c(0,0.2,0.45,0.63,0.78,0.91,1)
+
+NW.investigation = function(M=5000, n=100){
+  
+  SE = matrix(NA, M, length(CP.to_check))
+  
+  for (i in 1:M){
+    boot.X = runif(n)
+    boot.Y = Y(boot.X)
+    SE[i,] = (sapply(CP.to_check, function(xi) NW.regEst(xi, boot.X, boot.Y, NW.h, Knorm)) - m(CP.to_check))^2
+  }
+  
+  MSE = colMeans(SE)
+  return(MSE)
+}
+
+NW.investigation.results = data.frame(
+  N25=NW.investigation(n=25),
+  N50=NW.investigation(n=50),
+  N100=NW.investigation(n=100),
+  N1000=NW.investigation(n=1000)
+)
+
+# Draw plot
+jpeg("Investigate.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y")
+lines(CP.x, m(CP.x), col = 1, lwd=2)
+abline(v=CP.to_check, col=2, lty=3)
+legend("topleft", 
+    legend = c("True"),
+    col = c(1),
+    lty = c(1),
+    cex = 1.5
+)
+title("Interesting points to investigate")
+dev.off()
+```
+# Parametric polynomial regression estimator
+## Best polynomial order
+
+```{r}
+
+```
+
+
+# Plotting and comparison
+```{r}
+NW.h = 0.024 # MSSE.minimized[2]
+
+n = 500
+CP.x = seq(0,1,length=n)
+CP.X = X(n)
+CP.Y = Y(CP.X)
+
+for (h in seq(0.001, 0.20, 0.002)){
+  jpeg(paste0("./plots/NW-", h, ".jpg"), quality = 100, width = 1080, height = 720)
+  plot(CP.X, CP.Y, pch="+", col = "grey")
+  points(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Knorm)), col = 2, pch=19)
+  #points(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Kunif)), col = 4, pch=19)
+  lines(CP.x, m(CP.x), col = 1, lwd=2)
+  legend("topleft", 
+    legend = c("True", "Gaussian"),
+    col = c(1, 2, 4),
+    lty = c(1, 0),
+    pch = c(NA, 19),
+    cex = 1.5
+  )
+  title(paste0("Nadaraya-watson regression with h=",h))
+  dev.off()
+  
+}
+
+
+```
+
+
+```{r}
+LM.poly = 15.31
+
+plot(X, CP.Y, pch="+", col = "grey")
+points(X, lm(CP.Y ~ poly(X,6.1))$fitted, col = 3, pch=16)
+points(X, lm(CP.Y ~ poly(X,15))$fitted, col = 2, pch=18)
+lines(x, m(x), col=1, lwd=1.5)
+```
+
+# Comparison between parametric and nonparam
+
+```{r}
+X = runif(100)
+CP.Y = Y(X)
+
+
+plot(X, CP.Y, pch="+", col = "grey")
+points(x, sapply(x, function(x) NW.regEst(x, X, CP.Y, NW.h, Knorm)), col = 4, pch=20, pty=2)
+#points(x, sapply(x, function(x) NW.regEst(x, X, CP.Y, NW.h, Kunif)), col = 4, pch=18)
+points(X, lm(CP.Y ~ poly(X, LM.poly))$fitted, col = 2, pch=18) # LM
+lines(x, m(x), col = 1, lwd=2)
+legend("topleft", 
+  legend = c("True", "NW Normal", "LM Poly"),
+  col = c(1, 4, 2),
+  lty = c(1, 1, 1), 
+  cex = 0.5
+)
+  
+
+
+```
+
+
+```{r}
+# Linear setup
+
+h = 0.04
+
+Knorm <- function(u) dnorm(u)
+
+NW = function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
+NW.estimator = sapply(x, function(x) NW(x, X, Y, h, Knorm))
+```
+
+```{r}
+
+# ndp = lm(Y ~ bs(X, intercept = T, knots = 4))
+
+# Monte-Carlo
+
+B = 1000
+n = 100
+x = seq(0, 1, length=n)
+eps = 0.5*rnorm(n)
+
+NW.boot = matrix(NA, B, n) 
+for (i in 1:B){
+  
+  X = runif(n)
+  Y = m(X) + eps
+  h = 0.04 #h_NR(X, Knorm)
+  NW.boot[i,] = sapply(x, function(x) NW(x, X, Y, h, Knorm))
+}
+
+NW.boot.mean = colMeans(NW.boot)
+NW.boot.bias = NW.boot.mean - m(x)
+
+NW.boot.MSE = (function(){
+  SE = matrix(NA, B, n)
+  for (i in 1:n) {
+    SE[,i] = (NW.boot[,i]-m(x[i]))^2
+  }
+  return(colMeans(SE))
+})()
+
+NW.boot.MSSE = mean(NW.boot.MSE)
+
+NW.boot.MISE = (function(){
+  return (
+    integrate(function(x) NW.boot.MSE[x] , 1, n, subdivisions = 1000)
+  )
+})()
+
+print(NW.boot.MSSE)
+print(NW.boot.MISE)
+
+```
+
+```{r}
+# ndpConf = predict(ndp, interval = "conf")
+plot(X, Y, pch="+", col = "grey")
+# lines(x, ndpConf[,2], type = "l", col = 1)
+lines(x, predict(smooth.spline(X, Y, cv = 3, spar = 0.6))$y, type = "l", col = 1, lwd=1.5)
+lines(x, ndp$fitted, type = "l", col = 4, lwd=1.5)
+# lines(x, ndpConf[,3], type = "l", col = 1)
+lines(x, NWnormEst, type = "l", col = 2, lwd=1.5)
+lines(x, m(x), type = "l", col = 3, lwd=1.5)
+legend("topleft", 
+  legend = c("LR", "NW", "True"),
+  col = c(4, 2, 3),
+  lty = c(1, 1, 1, 1), cex = 0.5)
+```
+
