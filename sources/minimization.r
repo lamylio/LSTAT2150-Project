@@ -79,7 +79,7 @@ NW.minimizeMSSE = function(Kernel = Knorm, h.test = seq(0.01, 0.15, 0.001), M = 
 }
 
 # -----
-# Haven't found a way to compute MISE with LM
+# Haven't found a way to compute MISE with LM (yet)
 # But as MSSE ~= MISE, this is fine.
 # This one returns MSSE, bandwidth, Bias and also the mean of the regressions (for variance)
 LM.minimizeMSSE = function(poly.test = seq(1, 20, 1), M = 200, ni = 100, raw=F){

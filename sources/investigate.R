@@ -59,24 +59,24 @@ CP.investigation.toframe = function(investigation_method){
 CP.investigation.drawMSE = function(investigation_frame, title){
   
   middle = nrow(investigation_frame)-1
-  
+  jpeg(paste0("./plots/investigation/",title,".jpg"), quality = 100, width = 1080, height = 720)
   plot(CP.investigation.samples, 
-    head(investigation_frame, 1), col = 1, lwd = 1, lty=2,
-    type="l", xlab="Sample size", ylab="MSE"
+    head(investigation_frame, 1), col = 1, lwd = 2, lty=2,
+    type="l", xlab="Sample size", ylab="MSE", ylim = c(-0.0001, min(max(investigation_frame), 0.4))
   )
   
   for (i in 2:middle){
-    lines(CP.investigation.samples, investigation_frame[i,], col = i, lwd = 1)
+    lines(CP.investigation.samples, investigation_frame[i,], col = i, lwd = 2)
   }
   
-  lines(CP.investigation.samples, tail(investigation_frame, 1), col = 1, lwd = 1, lty=3)
+  lines(CP.investigation.samples, tail(investigation_frame, 1), col = 1, lwd = 2, lty=3)
   abline(h = 0, lty = 2)
   legend("topright", 
     legend = CP.to_check, 
     col = c(1, 2:middle, 1),
     lty = c(2, rep(1,middle-1), 3),
     lwd = 2,
-    cex = 0.8
+    cex = 1.5 #0.8
   )
   title(title)
 }
