@@ -11,20 +11,25 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Setup
 ```{r}
-set.seed(2020)
+# ---
+# Please see setup.R
+# ---
 
-# Import custom R files
+set.seed(2020)
 source("./sources/setup.r")
 source("./sources/minimization.r")
+source("./sources/investigate.R")
 
-# Global constant X & Y (used for comparison)
+# Global X and Y
 CP.X = X(n)
 CP.Y = Y(CP.X)
 CP.x = seq(0, 1, length = n) 
 
-# Kernels
+CP.XO = sort(CP.X)
+CP.YO = CP.Y[order(CP.X)]
+
+# Kernel
 Knorm = function(u) dnorm(u) #Gaussian kernel
-Kunif = function(u) (abs(u) <= 1) * 0.5 #Uniform kernel
 
 # NW Estimator
 NW.regEst <- function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
@@ -33,51 +38,61 @@ NW.regEst <- function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
 # Finding best bandwidth and polynomial order
 
 ```{r}
-# See ./sources/minimization.r
+# ---
+# Please see minimize.R
+# ---
+
 # Warning: might take a while
 # Use ni=100, M=100 by default but better results with higher values
 
-# NW.MISE = NW.minimizeMISE() # 0.041
-# NW.MSSE = NW.minimizeMSSE() # 0.036
+# NW.MISE = NW.minimizeMISE()
+# NW.MSSE = NW.minimizeMSSE()
 # ---
 
-NW.MISE = NW.minimizeMISE(h.test = seq(0.035, 0.037, 0.00001), M=200)
-LM.MSSE = LM.minimizeMSSE() # 
+NW.optimal = NW.minimizeMSSE(h.test = seq(0.035, 0.036, 0.00001), M=200) # more precise
+LM.optimal = LM.minimizeMSSE(M=500) # can also use decimal as degree, but that's not "polynomial"
 
 # Optimal bandwidth
-NW.h = 0.0355 # NW.MISE[2]
+NW.h = NW.optimal$h[1] # 0.0355
 # Optimal degree
-LM.poly = 6 # LM.MSSE[2]
+LM.poly = LM.optimal$poly[1] # 6
+```
+
+## Investigation of the optimal model
+### Bias, Variance and MSSE
+
+```{r}
+# As X.optimal already contains the bias and the MSSE
+# we only need to compute the variance, via MReg = \bar{x}
+
+NW.optimal$variance = round(
+  mean(
+    (sapply(seq(0,1,length=nrow(NW.optimal)), function(x) NW.regEst(x, CP.X, CP.Y, NW.h, Knorm)) - NW.optimal$MReg)^2
+  )
+,4)
+
+LM.optimal$variance = round(
+  mean(
+    (lm(CP.YO ~ poly(CP.XO, LM.poly))$fitted - LM.optimal$MReg)^2
+  )
+,4)
+
+# head(NW.optimal, 1)
+# head(LM.optimal, 1)
 ```
 
 ## Investigation at interesting points
+### Of the MSE
 
 ```{r}
-CP.to_check = c(0,0.2,0.45,0.63,0.78,0.91,1)
+# ---
+# Please see investigate.R
+# ---
 
-NW.investigation = function(M=5000, n=100){
-  
-  SE = matrix(NA, M, length(CP.to_check))
-  
-  for (i in 1:M){
-    boot.X = runif(n)
-    boot.Y = Y(boot.X)
-    SE[i,] = (sapply(CP.to_check, function(xi) NW.regEst(xi, boot.X, boot.Y, NW.h, Knorm)) - m(CP.to_check))^2
-  }
-  
-  MSE = colMeans(SE)
-  return(MSE)
-}
+CP.to_check = c(0,0.2,0.45,0.63,0.78,0.91,1) 
+CP.investigation.samples = c(25,50,100,200,400,600,800,1000) # smoother lines 
 
-NW.investigation.results = data.frame(
-  N25=NW.investigation(n=25),
-  N50=NW.investigation(n=50),
-  N100=NW.investigation(n=100),
-  N1000=NW.investigation(n=1000)
-)
-
-# Draw plot
-jpeg("Investigate.jpg", quality = 100, width = 1080, height = 720)
+# Draw which points
 plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y")
 lines(CP.x, m(CP.x), col = 1, lwd=2)
 abline(v=CP.to_check, col=2, lty=3)
@@ -88,15 +103,20 @@ legend("topleft",
     cex = 1.5
 )
 title("Interesting points to investigate")
-dev.off()
+
+# Compute all the MSE
+NW.investigation.results = CP.investigation.toframe(NW.investigation)
+LM.investigation.results = CP.investigation.toframe(LM.investigation)
+
+# Draw the evolution
+CP.investigation.drawMSE(NW.investigation.results, "MSE evolution for NW")
+CP.investigation.drawMSE(LM.investigation.results, "MSE evolution for LM")
+
 ```
-# Parametric polynomial regression estimator
-## Best polynomial order
 
-```{r}
-
-```
-
+# =====
+#  END
+# =====
 
 # Plotting and comparison
 ```{r}
@@ -107,10 +127,10 @@ CP.x = seq(0,1,length=n)
 CP.X = X(n)
 CP.Y = Y(CP.X)
 
-for (h in seq(0.001, 0.20, 0.002)){
-  jpeg(paste0("./plots/NW-", h, ".jpg"), quality = 100, width = 1080, height = 720)
+for (h in seq(0.0002, 0.05, 0.0002)){
+  jpeg(paste0("./plots/NW-Line-100/NW-", h, ".jpg"), quality = 100, width = 1080, height = 720)
   plot(CP.X, CP.Y, pch="+", col = "grey")
-  points(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Knorm)), col = 2, pch=19)
+  lines(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Knorm)), col = 2, pch=19, lwd=1.5)
   #points(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Kunif)), col = 4, pch=19)
   lines(CP.x, m(CP.x), col = 1, lwd=2)
   legend("topleft", 
