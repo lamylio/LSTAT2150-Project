@@ -15,18 +15,19 @@ knitr::opts_chunk$set(echo = TRUE)
 # Please see setup.R
 # ---
 
-set.seed(2020)
+set.seed(122020)
 source("./sources/setup.r")
+source("./sources/drawing.r")
 source("./sources/minimization.r")
 source("./sources/investigate.R")
 
 # Global X and Y
-CP.X = X(n)
+CP.X = sort(X(n))
 CP.Y = Y(CP.X)
 CP.x = seq(0, 1, length = n) 
-
-CP.XO = sort(CP.X)
-CP.YO = CP.Y[order(CP.X)]
+# # Sorted
+# CP.X = sort(CP.X)
+# CP.Y = CP.Y[order(CP.X)]
 
 # Kernel
 Knorm = function(u) dnorm(u) #Gaussian kernel
@@ -37,25 +38,30 @@ NW.regEst <- function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
 
 # Finding best bandwidth and polynomial order
 
-```{r}
+```{r, echo=F, error=F, warning=F}
 # ---
 # Please see minimize.R
 # ---
 
+# ---
 # Warning: might take a while
 # Use ni=100, M=100 by default but better results with higher values
-
-# NW.MISE = NW.minimizeMISE()
-# NW.MSSE = NW.minimizeMSSE()
 # ---
 
-NW.optimal = NW.minimizeMSSE(h.test = seq(0.03, 0.05, 0.0001), M=200) # more precise
-LM.optimal = LM.minimizeMSSE(M=500) # can also use decimal as degree, but that's not "polynomial"
+# NW.minimizeMISE(h.test = seq(0.03, 0.05, 0.001), M=500)
+
+NW.optimal = NW.minimizeMSSE(h.test = seq(0.03, 0.05, 0.001), M=500)
+LM.optimal = LM.minimizeMSSE(M=500)
 
 # Optimal bandwidth
-NW.h = NW.optimal$h[1] # 0.0355
+NW.h = NW.optimal$h[1] # 0.036
 # Optimal degree
-LM.poly = LM.optimal$poly[1] # 6
+LM.poly = LM.optimal$poly[1] # 7
+
+# Models (for futur use)
+
+NW.optimal.model = sapply(seq(0,1,length=nrow(NW.optimal)), function(x) NW.regEst(x, CP.X, CP.Y, NW.h, Knorm))
+LM.optimal.model = lm(CP.Y ~ poly(CP.X, LM.poly))$fitted
 ```
 
 ## Investigation of the optimal model
@@ -63,18 +69,14 @@ LM.poly = LM.optimal$poly[1] # 6
 
 ```{r}
 # As X.optimal already contains the bias and the MSSE
-# we only need to compute the variance, via MReg = \bar{x}
+# we only need to compute the variance, via MReg
 
 NW.optimal$variance = round(
-  mean(
-    (sapply(seq(0,1,length=nrow(NW.optimal)), function(x) NW.regEst(x, CP.X, CP.Y, NW.h, Knorm)) - NW.optimal$MReg)^2
-  )
+  mean((NW.optimal.model - NW.optimal$MReg)^2)
 ,4)
 
 LM.optimal$variance = round(
-  mean(
-    (lm(CP.YO ~ poly(CP.XO, LM.poly))$fitted - LM.optimal$MReg)^2
-  )
+  mean((LM.optimal.model - LM.optimal$MReg)^2)
 ,4)
 
 # head(NW.optimal, 1)
@@ -96,22 +98,93 @@ CP.investigation.samples = c(25,50,100,200,400,600,800,1000) # smoother lines
 plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y")
 lines(CP.x, m(CP.x), col = 1, lwd=2)
 abline(v=CP.to_check, col=2, lty=3)
+title("Interesting points to investigate")
 legend("topleft", 
     legend = c("True"),
     col = c(1),
     lty = c(1),
     cex = 1.5
 )
-title("Interesting points to investigate")
 
 # Compute all the MSE
 NW.investigation.results = CP.investigation.toframe(NW.investigation)
 LM.investigation.results = CP.investigation.toframe(LM.investigation)
+```
 
-# Draw the evolution
-CP.investigation.drawMSE(NW.investigation.results, "MSE evolution for NW")
-CP.investigation.drawMSE(LM.investigation.results, "MSE evolution for LM")
+# Some plots 
 
+```{r}
+# ---
+# Please see drawing.R
+# ---
+
+# ---
+# Draw the evolution of MSE
+CP.drawMSE(NW.investigation.results, "MSE evolution for NW", save=T)
+CP.drawMSE(LM.investigation.results, "MSE evolution for LM", save=T)
+
+# ---
+# Plot both LM and NW best regression
+CP.drawComparison(NW.optimal$MReg, LM.optimal$MReg, 100, save=F)
+
+# ===
+
+# ---
+# Plot the bias alone
+
+jpeg("./plots/bias/NW-Alone.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.x, NW.optimal$Bias, col=2, lwd=2, lty=1,type="l", xlab = "x", ylab="Bias", main="NW-Bias evolution")
+abline(h=0, col=1, lty=3)
+dev.off()
+
+jpeg("./plots/bias/LM-Alone.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.x, LM.optimal$Bias, col=4, lwd=2, lty=1, type="l", xlab = "x", ylab="Bias", main="LM-Bias evolution")
+abline(h=0, col=1, lty=3)
+dev.off()
+
+# Both in the same time
+jpeg("./plots/bias/NW-LM-Alone.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.x, NW.optimal$Bias, col=2, lwd=2, lty=1,type="l", xlab = "x", ylab="Bias", main="NW & LM Bias evolution")
+lines(CP.x, LM.optimal$Bias, col=4, lwd=2, lty=1)
+abline(h=0, col=1, lty=3)
+legend("topleft", 
+   legend = c("True", "NW Bias", "LM Bias"),
+   col = c(1, 2, 4),
+   lty = c(1, 1, 1),
+   cex = 1.5
+)
+dev.off()
+
+# ---
+# Plot bias and regression
+
+jpeg("./plots/bias/NW-Both.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y", main="NW and Bias")
+lines(CP.x, m(CP.x), col = 1, lwd=2)
+lines(CP.x, NW.optimal$MReg, col=2, lty=1, lwd=2) 
+lines(CP.x, NW.optimal$Bias, col=6, lty=2)
+abline(h=0, col=1, lty=3)
+legend("topleft", 
+   legend = c("True", "NW Regression", "NW Bias"),
+   col = c(1, 2, 6),
+   lty = c(1, 1, 2),
+   cex = 1.5
+)
+dev.off()
+
+jpeg("./plots/bias/LM-Both.jpg", quality = 100, width = 1080, height = 720)
+plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y", main="LM and Bias")
+lines(CP.x, m(CP.x), col = 1, lwd=2)
+lines(CP.x, LM.optimal$MReg, col=4, lty=1, lwd=2)
+lines(CP.x, LM.optimal$Bias, col=5, lty=2)
+abline(h=0, col=1, lty=3)
+legend("topleft", 
+   legend = c("True", "LM Regression", "LM Bias"),
+   col = c(1, 4, 5),
+   lty = c(1, 1, 2),
+   cex = 1.5
+)
+dev.off()
 ```
 
 # =====
@@ -120,122 +193,24 @@ CP.investigation.drawMSE(LM.investigation.results, "MSE evolution for LM")
 
 # Plotting and comparison
 ```{r}
-NW.h = 0.024 # MSSE.minimized[2]
 
-n = 500
-CP.x = seq(0,1,length=n)
-CP.X = X(n)
-CP.Y = Y(CP.X)
+for(p in 1:20){
 
-for (h in seq(0.0002, 0.05, 0.0002)){
-  jpeg(paste0("./plots/NW-Line-100/NW-", h, ".jpg"), quality = 100, width = 1080, height = 720)
-  plot(CP.X, CP.Y, pch="+", col = "grey")
-  lines(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Knorm)), col = 2, pch=19, lwd=1.5)
-  #points(CP.x, sapply(CP.x, function(x) NW.regEst(x, CP.X, CP.Y, h, Kunif)), col = 4, pch=19)
+  jpeg(paste0("./plots/LM-Line-100-Boot/",p,".jpg"), quality = 100, width = 1080, height = 720)
+  plot(CP.X, CP.Y, pch="+", col = "grey", xlab = "x", ylab="Y", main=paste0("Polynomial regression with degree=",p))
+  lines(CP.X, lm(CP.Y ~ poly(CP.X, degree = p))$fitted, lwd=2, col=4)
   lines(CP.x, m(CP.x), col = 1, lwd=2)
   legend("topleft", 
-    legend = c("True", "Gaussian"),
-    col = c(1, 2, 4),
-    lty = c(1, 0),
-    pch = c(NA, 19),
-    cex = 1.5
+     legend = c("True", "Regression"),
+     col = c(1, 4),
+     lty = c(1, 1),
+     cex = 1.5
   )
-  title(paste0("Nadaraya-watson regression with h=",h))
   dev.off()
-  
 }
 
-
 ```
 
-
-```{r}
-LM.poly = 15.31
-
-plot(X, CP.Y, pch="+", col = "grey")
-points(X, lm(CP.Y ~ poly(X,6.1))$fitted, col = 3, pch=16)
-points(X, lm(CP.Y ~ poly(X,15))$fitted, col = 2, pch=18)
-lines(x, m(x), col=1, lwd=1.5)
-```
-
-# Comparison between parametric and nonparam
-
-```{r}
-X = runif(100)
-CP.Y = Y(X)
-
-
-plot(X, CP.Y, pch="+", col = "grey")
-points(x, sapply(x, function(x) NW.regEst(x, X, CP.Y, NW.h, Knorm)), col = 4, pch=20, pty=2)
-#points(x, sapply(x, function(x) NW.regEst(x, X, CP.Y, NW.h, Kunif)), col = 4, pch=18)
-points(X, lm(CP.Y ~ poly(X, LM.poly))$fitted, col = 2, pch=18) # LM
-lines(x, m(x), col = 1, lwd=2)
-legend("topleft", 
-  legend = c("True", "NW Normal", "LM Poly"),
-  col = c(1, 4, 2),
-  lty = c(1, 1, 1), 
-  cex = 0.5
-)
-  
-
-
-```
-
-
-```{r}
-# Linear setup
-
-h = 0.04
-
-Knorm <- function(u) dnorm(u)
-
-NW = function(x, X, Y, h, K) sum(Y * K((x - X)/h))/sum(K((x - X)/h))
-NW.estimator = sapply(x, function(x) NW(x, X, Y, h, Knorm))
-```
-
-```{r}
-
-# ndp = lm(Y ~ bs(X, intercept = T, knots = 4))
-
-# Monte-Carlo
-
-B = 1000
-n = 100
-x = seq(0, 1, length=n)
-eps = 0.5*rnorm(n)
-
-NW.boot = matrix(NA, B, n) 
-for (i in 1:B){
-  
-  X = runif(n)
-  Y = m(X) + eps
-  h = 0.04 #h_NR(X, Knorm)
-  NW.boot[i,] = sapply(x, function(x) NW(x, X, Y, h, Knorm))
-}
-
-NW.boot.mean = colMeans(NW.boot)
-NW.boot.bias = NW.boot.mean - m(x)
-
-NW.boot.MSE = (function(){
-  SE = matrix(NA, B, n)
-  for (i in 1:n) {
-    SE[,i] = (NW.boot[,i]-m(x[i]))^2
-  }
-  return(colMeans(SE))
-})()
-
-NW.boot.MSSE = mean(NW.boot.MSE)
-
-NW.boot.MISE = (function(){
-  return (
-    integrate(function(x) NW.boot.MSE[x] , 1, n, subdivisions = 1000)
-  )
-})()
-
-print(NW.boot.MSSE)
-print(NW.boot.MISE)
-
-```
 
 ```{r}
 # ndpConf = predict(ndp, interval = "conf")
