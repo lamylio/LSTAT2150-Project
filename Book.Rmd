@@ -125,7 +125,7 @@ CP.drawMSE(LM.investigation.results, "MSE evolution for LM", save=T)
 
 # ---
 # Plot both LM and NW best regression
-CP.drawComparison(NW.optimal$MReg, LM.optimal$MReg, 100, save=F)
+CP.drawComparison(NW.optimal$MReg, LM.optimal$MReg, 100, save=T)
 
 # ===
 

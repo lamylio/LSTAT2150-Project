@@ -1,7 +1,6 @@
 # Compute the MSE by M Monte-carlo simulations
 
 NW.investigation = function(M=5000, n=100){
-  set.seed(122020)
   SE = matrix(NA, M, length(CP.to_check))
   
   for (i in 1:M){
@@ -17,7 +16,6 @@ NW.investigation = function(M=5000, n=100){
 # ---
 
 LM.investigation = function(M=5000, n=100){
-  set.seed(122020)
   SE = matrix(NA, M, length(CP.to_check))
   
   for (i in 1:M){
